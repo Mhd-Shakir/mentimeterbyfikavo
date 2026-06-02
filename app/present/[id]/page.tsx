@@ -309,11 +309,7 @@ export default function PresentPage() {
                     {optionVotes.map((option) => (
                       <div
                         key={option.id}
-                        className={`rounded-xl border p-4 transition-all ${
-                          option.correct
-                            ? "border-green-200 bg-green-50"
-                            : "border-surface-border bg-surface-muted"
-                        }`}
+                        className="rounded-xl border p-4 transition-all border-surface-border bg-surface-muted"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <span className="text-sm font-bold text-slate-800">{option.option_text}</span>
@@ -321,9 +317,7 @@ export default function PresentPage() {
                         </div>
                         <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-surface-border">
                           <div
-                            className={`h-full rounded-full transition-all ${
-                              option.correct ? "bg-green-500" : "bg-fikavo-500"
-                            }`}
+                            className="h-full rounded-full transition-all bg-fikavo-500"
                             style={{ width: `${option.pct}%` }}
                           />
                         </div>
