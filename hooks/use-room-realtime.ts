@@ -10,6 +10,7 @@ type RoomRealtimeState = {
   activeCount: number;
   lastEvent: RoomEvent | null;
   responses: Response[];
+  participants: { nickname: string; joinedAt: string }[];
 };
 
 export function useRoomRealtime(roomCode: string, nickname?: string) {
@@ -17,7 +18,8 @@ export function useRoomRealtime(roomCode: string, nickname?: string) {
   const [state, setState] = useState<RoomRealtimeState>({
     activeCount: 0,
     lastEvent: null,
-    responses: []
+    responses: [],
+    participants: []
   });
   const [presentation, setPresentation] = useState<Presentation | null>(null);
 
@@ -32,9 +34,53 @@ export function useRoomRealtime(roomCode: string, nickname?: string) {
       })
       .on("presence", { event: "sync" }, () => {
         const presenceState = channel.presenceState();
+        const participantsList = Object.values(presenceState)
+          .flatMap((p: any) => p)
+          .filter((p: any) => p.nickname && p.nickname !== "Presenter")
+          .map((p: any) => ({ nickname: p.nickname, joinedAt: p.joinedAt }));
+        
+        const uniqueParticipants = Array.from(
+          new Map(participantsList.map((p) => [p.nickname, p])).values()
+        );
+
         setState((current) => ({
           ...current,
-          activeCount: Object.keys(presenceState).length
+          activeCount: uniqueParticipants.length,
+          participants: uniqueParticipants
+        }));
+      })
+      .on("presence", { event: "join" }, () => {
+        const presenceState = channel.presenceState();
+        const participantsList = Object.values(presenceState)
+          .flatMap((p: any) => p)
+          .filter((p: any) => p.nickname && p.nickname !== "Presenter")
+          .map((p: any) => ({ nickname: p.nickname, joinedAt: p.joinedAt }));
+        
+        const uniqueParticipants = Array.from(
+          new Map(participantsList.map((p) => [p.nickname, p])).values()
+        );
+
+        setState((current) => ({
+          ...current,
+          activeCount: uniqueParticipants.length,
+          participants: uniqueParticipants
+        }));
+      })
+      .on("presence", { event: "leave" }, () => {
+        const presenceState = channel.presenceState();
+        const participantsList = Object.values(presenceState)
+          .flatMap((p: any) => p)
+          .filter((p: any) => p.nickname && p.nickname !== "Presenter")
+          .map((p: any) => ({ nickname: p.nickname, joinedAt: p.joinedAt }));
+        
+        const uniqueParticipants = Array.from(
+          new Map(participantsList.map((p) => [p.nickname, p])).values()
+        );
+
+        setState((current) => ({
+          ...current,
+          activeCount: uniqueParticipants.length,
+          participants: uniqueParticipants
         }));
       })
       .on("broadcast", { event: "slide-change" }, ({ payload }) => {

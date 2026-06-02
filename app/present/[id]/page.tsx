@@ -354,28 +354,55 @@ export default function PresentPage() {
           </div>
           <div className="rounded-xl border border-surface-border bg-white p-4 shadow-card">
             <div className="mb-3 flex items-center gap-2">
-              <Crown className="size-5 text-amber-500" />
-              <h2 className="text-sm font-bold text-slate-800">Leaderboard</h2>
+              {activeQuestion ? (
+                <>
+                  <Crown className="size-5 text-amber-500" />
+                  <h2 className="text-sm font-bold text-slate-800">Leaderboard</h2>
+                </>
+              ) : (
+                <>
+                  <Users className="size-5 text-fikavo-500" />
+                  <h2 className="text-sm font-bold text-slate-800">Live Participants</h2>
+                </>
+              )}
             </div>
             <div className="space-y-2">
-              {leaderboard.slice(0, 10).map((player, index) => (
-                <div key={player.nickname} className="flex items-center justify-between rounded-lg bg-surface-muted px-3 py-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className={`text-xs font-bold ${
-                      index === 0 ? "text-amber-500" :
-                      index === 1 ? "text-slate-400" :
-                      index === 2 ? "text-orange-400" :
-                      "text-slate-400"
-                    }`}>
-                      #{index + 1}
-                    </span>
-                    <span className="truncate text-sm font-medium text-slate-700">{player.nickname}</span>
-                  </div>
-                  <span className="font-mono text-sm font-bold text-fikavo-600">{player.points}</span>
-                </div>
-              ))}
-              {leaderboard.length === 0 && (
-                <p className="text-sm text-slate-400">No answers yet.</p>
+              {activeQuestion ? (
+                <>
+                  {leaderboard.slice(0, 10).map((player, index) => (
+                    <div key={player.nickname} className="flex items-center justify-between rounded-lg bg-surface-muted px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`text-xs font-bold ${
+                          index === 0 ? "text-amber-500" :
+                          index === 1 ? "text-slate-400" :
+                          index === 2 ? "text-orange-400" :
+                          "text-slate-400"
+                        }`}>
+                          #{index + 1}
+                        </span>
+                        <span className="truncate text-sm font-medium text-slate-700">{player.nickname}</span>
+                      </div>
+                      <span className="font-mono text-sm font-bold text-fikavo-600">{player.points}</span>
+                    </div>
+                  ))}
+                  {leaderboard.length === 0 && (
+                    <p className="text-sm text-slate-400">No answers yet.</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  {room.participants.slice(0, 10).map((player) => (
+                    <div key={player.nickname} className="flex items-center justify-between rounded-lg bg-surface-muted px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="size-2 rounded-full bg-green-500 animate-pulse" />
+                        <span className="truncate text-sm font-medium text-slate-700">{player.nickname}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {room.participants.length === 0 && (
+                    <p className="text-sm text-slate-400">Waiting for players...</p>
+                  )}
+                </>
               )}
             </div>
           </div>
