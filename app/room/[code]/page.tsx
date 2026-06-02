@@ -106,7 +106,7 @@ export default function ParticipantRoomPage() {
   useEffect(() => {
     if (!room.lastEvent) return;
     if (room.lastEvent.type === "slide-change") {
-      setStartedAt(new Date(room.lastEvent.startedAt).getTime());
+      setStartedAt(Date.now());
       setFeedback(null);
     }
     if (room.lastEvent.type === "quiz-ended") {
@@ -158,7 +158,7 @@ export default function ParticipantRoomPage() {
 
   return (
     <main className="flex min-h-dvh flex-col bg-gradient-to-b from-white to-surface-muted">
-      <header className="border-b border-surface-border bg-white/80 backdrop-blur-lg">
+      <header className="border-b border-surface-border bg-white/80 backdrop-blur-lg pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex max-w-lg items-center justify-between px-5 py-4">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-fikavo-600">Fikavo Live</p>
@@ -171,7 +171,7 @@ export default function ParticipantRoomPage() {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-5 py-6">
+      <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-5 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
         <AnimatePresence mode="wait">
           {currentSlideState === "waiting" && (
             <motion.div

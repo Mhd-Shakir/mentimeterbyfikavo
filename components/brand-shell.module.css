@@ -21,8 +21,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.5rem;
+  padding: max(1rem, var(--safe-area-inset-top)) 1.5rem 1rem;
   width: 100%;
+}
+
+@media (max-width: 640px) {
+  .headerContainer {
+    padding: max(0.75rem, var(--safe-area-inset-top)) 1rem 0.75rem;
+  }
 }
 
 .logoLink {

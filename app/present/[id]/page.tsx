@@ -81,7 +81,7 @@ export default function PresentPage() {
     if (!room.lastEvent) return;
     if (room.lastEvent.type === "slide-change") {
       setShowingLeaderboard(false);
-      setStartedAt(new Date(room.lastEvent.startedAt).getTime());
+      setStartedAt(Date.now());
     }
   }, [room.lastEvent]);
 
@@ -184,7 +184,7 @@ export default function PresentPage() {
 
   return (
     <main className="min-h-dvh bg-surface">
-      <header className="sticky top-0 z-50 border-b border-surface-border bg-white/80 backdrop-blur-lg">
+      <header className="sticky top-0 z-50 border-b border-surface-border bg-white/80 backdrop-blur-lg pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <Link href="/dashboard" className="text-sm font-semibold text-slate-500 hover:text-slate-700">
@@ -222,8 +222,8 @@ export default function PresentPage() {
         </div>
       </header>
 
-      <section className="mx-auto grid w-full max-w-7xl gap-4 px-4 py-4 lg:grid-cols-[1fr_20rem]">
-        <div className="min-h-[30rem] rounded-xl border border-surface-border bg-white p-5 shadow-card">
+      <section className="mx-auto grid w-full max-w-7xl gap-4 px-4 py-4 lg:grid-cols-[1fr_20rem] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div className="min-h-[30rem] rounded-xl border border-surface-border bg-white p-4 md:p-5 shadow-card">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeQuestion?.id ?? "waiting"}

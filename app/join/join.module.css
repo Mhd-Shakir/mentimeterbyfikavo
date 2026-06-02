@@ -7,7 +7,13 @@
 }
 
 .header {
-  padding: 1.5rem;
+  padding: max(1.5rem, var(--safe-area-inset-top)) 1.5rem 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .header {
+    padding: max(1rem, var(--safe-area-inset-top)) 1rem 1rem;
+  }
 }
 
 .backButton {
@@ -34,8 +40,14 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 2rem 1.5rem 6rem;
+  padding: 2rem 1.5rem calc(6rem + var(--safe-area-inset-bottom));
   animation: fadeIn 0.5s ease-out;
+}
+
+@media (max-width: 640px) {
+  .content {
+    padding: 1rem 1rem calc(3rem + var(--safe-area-inset-bottom));
+  }
 }
 
 .headerWrap {
