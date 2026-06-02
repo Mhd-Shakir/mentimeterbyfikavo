@@ -103,7 +103,7 @@ export default function ParticipantRoomPage() {
     }
   }, [room.lastEvent]);
 
-  let currentSlideState = slideState;
+  let currentSlideState: SlideState = slideState;
   if (room.lastEvent?.type === "leaderboard-show") {
     currentSlideState = "leaderboard";
   }

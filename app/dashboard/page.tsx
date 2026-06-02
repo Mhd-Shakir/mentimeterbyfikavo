@@ -70,7 +70,7 @@ export default function DashboardPage() {
       // Ensure the profile exists to prevent foreign key errors when creating decks
       await supabase.from("profiles").upsert({ 
         id: authUser.id, 
-        email: authUser.email 
+        email: authUser.email ?? "" 
       });
       
       setUserId(authUser.id);
@@ -90,7 +90,7 @@ export default function DashboardPage() {
       // Ignore errors here if the profile already exists, just attempt to insert it
       await supabase.from("profiles").insert({ 
         id: user.id, 
-        email: user.email 
+        email: user.email ?? "" 
       });
     }
 
