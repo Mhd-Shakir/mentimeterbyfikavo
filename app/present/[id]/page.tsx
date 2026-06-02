@@ -20,6 +20,9 @@ export default function PresentPage() {
   const [responses, setResponses] = useState<ResponseType[]>([]);
   const [status, setStatus] = useState("Loading presenter screen...");
   const [loading, setLoading] = useState(true);
+  const [showingLeaderboard, setShowingLeaderboard] = useState(false);
+  const [startedAt, setStartedAt] = useState(Date.now());
+  const [timeLeft, setTimeLeft] = useState(0);
   const room = useRoomRealtime(deck?.room_code ?? "");
   const activeQuestion = deck ? questions[deck.current_slide_index] : undefined;
   const joinUrl = typeof window === "undefined" || !deck ? "" : `${window.location.origin}/join?code=${deck.room_code}`;
@@ -74,6 +77,26 @@ export default function PresentPage() {
     }
   }, [room.responses]);
 
+  useEffect(() => {
+    if (!room.lastEvent) return;
+    if (room.lastEvent.type === "slide-change") {
+      setShowingLeaderboard(false);
+      setStartedAt(new Date(room.lastEvent.startedAt).getTime());
+    }
+  }, [room.lastEvent]);
+
+  useEffect(() => {
+    if (!deck?.is_live || !activeQuestion) return;
+
+    const interval = setInterval(() => {
+      const elapsed = (Date.now() - startedAt) / 1000;
+      const remaining = Math.max(0, Math.ceil(activeQuestion.time_limit - elapsed));
+      setTimeLeft(remaining);
+    }, 200);
+
+    return () => clearInterval(interval);
+  }, [deck?.is_live, activeQuestion, startedAt]);
+
   const goToSlide = useCallback(async (slideIndex: number) => {
     if (!deck) return;
     const boundedIndex = Math.min(slideIndex, questions.length - 1);
@@ -96,12 +119,24 @@ export default function PresentPage() {
     }
 
     setDeck(data);
+    setShowingLeaderboard(false);
+    const now = new Date();
+    setStartedAt(now.getTime());
     await broadcastRoomEvent(supabase, deck.room_code, {
       type: "slide-change",
       slideIndex: boundedIndex,
-      startedAt: new Date().toISOString()
+      startedAt: now.toISOString()
     });
   }, [deck, questions.length, supabase]);
+
+  const showLeaderboard = useCallback(async () => {
+    if (!deck) return;
+    setShowingLeaderboard(true);
+    await broadcastRoomEvent(supabase, deck.room_code, {
+      type: "leaderboard-show",
+      slideIndex: deck.current_slide_index
+    });
+  }, [deck, supabase]);
 
   const endQuiz = useCallback(async () => {
     if (!deck) return;
@@ -168,10 +203,15 @@ export default function PresentPage() {
                 <Play className="size-3.5" />
                 Start
               </Button>
+            ) : !showingLeaderboard ? (
+              <Button size="sm" onClick={showLeaderboard}>
+                <Crown className="size-3.5" />
+                Show Leaderboard
+              </Button>
             ) : (
               <Button size="sm" onClick={() => goToSlide((deck?.current_slide_index ?? 0) + 1)} disabled={(deck?.current_slide_index ?? 0) >= questions.length - 1}>
                 <ArrowRight className="size-3.5" />
-                Next
+                Next Question
               </Button>
             )}
             <Button size="sm" variant="danger" onClick={endQuiz}>
@@ -203,14 +243,63 @@ export default function PresentPage() {
                     {questions.length} questions prepared
                   </div>
                 </div>
+              ) : showingLeaderboard ? (
+                <div className="flex min-h-[30rem] flex-col items-center justify-center p-8">
+                  <div className="mb-8 flex items-center gap-3">
+                    <Crown className="size-10 text-amber-500" />
+                    <h2 className="text-4xl font-black text-slate-900">Leaderboard</h2>
+                  </div>
+                  <div className="w-full max-w-2xl space-y-4">
+                    {(() => {
+                      const maxScore = leaderboard.length > 0 ? Math.max(leaderboard[0].points, 1) : 1;
+                      return leaderboard.slice(0, 10).map((player, index) => {
+                        const pct = Math.max((player.points / maxScore) * 100, 2); // At least 2% so it's slightly visible
+                        return (
+                          <div key={player.nickname} className="relative overflow-hidden rounded-2xl bg-slate-50 shadow-sm border border-slate-100">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${pct}%` }}
+                              transition={{ duration: 1, ease: "easeOut", delay: index * 0.1 }}
+                              className={`absolute inset-y-0 left-0 opacity-20 ${
+                                index === 0 ? "bg-amber-500" :
+                                index === 1 ? "bg-slate-500" :
+                                index === 2 ? "bg-orange-500" :
+                                "bg-fikavo-500"
+                              }`}
+                            />
+                            <div className="relative flex items-center justify-between p-6">
+                              <div className="flex items-center gap-6">
+                                <span className={`flex size-10 items-center justify-center rounded-full text-lg font-black ${
+                                  index === 0 ? "bg-amber-100 text-amber-600" :
+                                  index === 1 ? "bg-slate-200 text-slate-600" :
+                                  index === 2 ? "bg-orange-100 text-orange-600" :
+                                  "bg-slate-100 text-slate-400"
+                                }`}>
+                                  {index + 1}
+                                </span>
+                                <span className="text-2xl font-bold text-slate-800">{player.nickname}</span>
+                              </div>
+                              <span className="font-mono text-3xl font-black text-fikavo-600">{player.points} pts</span>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                    {leaderboard.length === 0 && (
+                      <p className="text-center text-lg text-slate-400">No scores yet.</p>
+                    )}
+                  </div>
+                </div>
               ) : (
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                       Question {deck ? deck.current_slide_index + 1 : 0} of {questions.length}
                     </p>
-                    <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
-                      {activeQuestion.time_limit}s
+                    <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+                      timeLeft <= 5 ? "bg-red-50 text-red-700 animate-pulse" : "bg-amber-50 text-amber-700"
+                    }`}>
+                      {timeLeft}s
                     </span>
                   </div>
                   <h2 className="text-2xl font-black leading-tight text-slate-900 md:text-3xl">
@@ -269,7 +358,7 @@ export default function PresentPage() {
               <h2 className="text-sm font-bold text-slate-800">Leaderboard</h2>
             </div>
             <div className="space-y-2">
-              {leaderboard.slice(0, 8).map((player, index) => (
+              {leaderboard.slice(0, 10).map((player, index) => (
                 <div key={player.nickname} className="flex items-center justify-between rounded-lg bg-surface-muted px-3 py-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className={`text-xs font-bold ${

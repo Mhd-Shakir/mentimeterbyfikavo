@@ -2,7 +2,8 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, LayoutDashboard, Plus, Trash2, Wand2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, LayoutDashboard, Plus, Trash2, Wand2, Edit3 } from "lucide-react";
 import { BrandShell } from "@/components/brand-shell";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +12,7 @@ import type { Presentation } from "@/lib/supabase/types";
 import styles from "./dashboard.module.css";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -106,56 +108,9 @@ export default function DashboardPage() {
       return;
     }
 
-    const seedQuestions = [
-      {
-        question_text: "Which launch metric matters most for a live quiz?",
-        time_limit: 20,
-        order_index: 0,
-        options: [
-          ["Answer latency", true],
-          ["Logo size", false],
-          ["Slide count", false],
-          ["Font weight", false]
-        ]
-      },
-      {
-        question_text: "What powers the free realtime sync in this build?",
-        time_limit: 25,
-        order_index: 1,
-        options: [
-          ["Supabase Realtime", true],
-          ["Socket.io server", false],
-          ["Polling only", false],
-          ["Static JSON", false]
-        ]
-      }
-    ];
-
-    for (const question of seedQuestions) {
-      const { data: createdQuestion } = await supabase
-        .from("questions")
-        .insert({
-          presentation_id: deck.id,
-          question_text: question.question_text,
-          time_limit: question.time_limit,
-          order_index: question.order_index
-        })
-        .select()
-        .single();
-
-      if (createdQuestion) {
-        await supabase.from("options").insert(
-          question.options.map(([option_text, is_correct]) => ({
-            question_id: createdQuestion.id,
-            option_text: String(option_text),
-            is_correct: Boolean(is_correct)
-          }))
-        );
-      }
-    }
-
     setDecks((current) => [deck, ...current]);
-    setStatus("Deck created with two starter questions.");
+    setStatus("Deck created. Redirecting to edit page...");
+    router.push(`/dashboard/${deck.id}`);
   }
 
   async function deleteDeck(deckId: string) {
@@ -250,6 +205,11 @@ export default function DashboardPage() {
                     <p className={styles.deckCode}>Room {deck.room_code}</p>
                   </div>
                   <div className={styles.deckActions}>
+                    <Button size="sm" variant="ghost" asChild>
+                      <Link href={`/dashboard/${deck.id}`}>
+                        <Edit3 size={16} color="var(--text-secondary)" />
+                      </Link>
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => deleteDeck(deck.id)}>
                       <Trash2 size={16} color="var(--text-secondary)" />
                     </Button>

@@ -40,6 +40,9 @@ export function useRoomRealtime(roomCode: string, nickname?: string) {
       .on("broadcast", { event: "slide-change" }, ({ payload }) => {
         setState((current) => ({ ...current, lastEvent: payload as RoomEvent }));
       })
+      .on("broadcast", { event: "leaderboard-show" }, ({ payload }) => {
+        setState((current) => ({ ...current, lastEvent: payload as RoomEvent }));
+      })
       .on("broadcast", { event: "quiz-ended" }, ({ payload }) => {
         setState((current) => ({ ...current, lastEvent: payload as RoomEvent }));
       })

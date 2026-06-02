@@ -16,7 +16,7 @@ type AnswerFeedback = {
   optionId: string;
 };
 
-type SlideState = "waiting" | "answering" | "feedback" | "ended";
+type SlideState = "waiting" | "answering" | "feedback" | "leaderboard" | "ended";
 
 export default function ParticipantRoomPage() {
   const params = useParams<{ code: string }>();
@@ -28,6 +28,7 @@ export default function ParticipantRoomPage() {
   const [questions, setQuestions] = useState<QuestionWithOptions[] | null>(null);
   const [startedAt, setStartedAt] = useState(Date.now());
   const [feedback, setFeedback] = useState<AnswerFeedback | null>(null);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [status, setStatus] = useState("Joining room...");
   const [loadAttempted, setLoadAttempted] = useState(false);
   const room = useRoomRealtime(roomCode, nickname);
@@ -102,6 +103,11 @@ export default function ParticipantRoomPage() {
     }
   }, [room.lastEvent]);
 
+  let currentSlideState = slideState;
+  if (room.lastEvent?.type === "leaderboard-show") {
+    currentSlideState = "leaderboard";
+  }
+
   const answer = useCallback(async (optionId: string) => {
     if (!activeQuestion || feedback) return;
     const selectedOption = activeQuestion.options.find((o) => o.id === optionId);
@@ -121,6 +127,22 @@ export default function ParticipantRoomPage() {
     });
   }, [activeQuestion, feedback, startedAt, supabase, roomCode, nickname]);
 
+  useEffect(() => {
+    if (currentSlideState !== "answering" || !activeQuestion || feedback) return;
+
+    const interval = setInterval(() => {
+      const elapsed = (Date.now() - startedAt) / 1000;
+      const remaining = Math.max(0, Math.ceil(activeQuestion.time_limit - elapsed));
+      setTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        setFeedback({ isCorrect: false, points: 0, optionId: "timeout" });
+      }
+    }, 200);
+
+    return () => clearInterval(interval);
+  }, [currentSlideState, activeQuestion, startedAt, feedback]);
+
   return (
     <main className="flex min-h-dvh flex-col bg-gradient-to-b from-white to-surface-muted">
       <header className="border-b border-surface-border bg-white/80 backdrop-blur-lg">
@@ -138,7 +160,7 @@ export default function ParticipantRoomPage() {
 
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-5 py-6">
         <AnimatePresence mode="wait">
-          {slideState === "waiting" && (
+          {currentSlideState === "waiting" && (
             <motion.div
               key="waiting"
               initial={{ opacity: 0, y: 14 }}
@@ -160,7 +182,7 @@ export default function ParticipantRoomPage() {
             </motion.div>
           )}
 
-          {slideState === "answering" && activeQuestion && (
+          {currentSlideState === "answering" && activeQuestion && (
             <motion.div
               key={activeQuestion.id}
               initial={{ opacity: 0, y: 14 }}
@@ -172,8 +194,10 @@ export default function ParticipantRoomPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Question {presentation ? presentation.current_slide_index + 1 : "?"}
                 </p>
-                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">
-                  {activeQuestion.time_limit}s
+                <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                  timeLeft <= 5 ? "bg-red-50 text-red-700 animate-pulse" : "bg-amber-50 text-amber-700"
+                }`}>
+                  {timeLeft}s
                 </span>
               </div>
               <h2 className="mb-6 text-xl font-black leading-tight text-slate-900">
@@ -193,7 +217,7 @@ export default function ParticipantRoomPage() {
             </motion.div>
           )}
 
-          {slideState === "feedback" && (
+          {currentSlideState === "feedback" && (
             <motion.div
               key="feedback"
               initial={{ opacity: 0, scale: 0.95 }}
@@ -214,7 +238,7 @@ export default function ParticipantRoomPage() {
                 <h2 className={`text-3xl font-black ${
                   feedback?.isCorrect ? "text-green-700" : "text-red-700"
                 }`}>
-                  {feedback?.isCorrect ? "Correct!" : "Not this time"}
+                  {feedback?.optionId === "timeout" ? "Time's Up!" : feedback?.isCorrect ? "Correct!" : "Not this time"}
                 </h2>
                 {feedback && (
                   <p className={`mt-2 text-3xl font-black ${
@@ -239,7 +263,36 @@ export default function ParticipantRoomPage() {
             </motion.div>
           )}
 
-          {slideState === "ended" && (
+          {currentSlideState === "leaderboard" && (
+            <motion.div
+              key="leaderboard"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="flex flex-1 flex-col items-center justify-center"
+            >
+              <div className="rounded-2xl border border-surface-border bg-white p-8 text-center shadow-card w-full">
+                <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl bg-amber-100">
+                  <span className="text-3xl">🏆</span>
+                </div>
+                <h2 className="text-2xl font-black text-slate-900">Look at the big screen!</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  The leaderboard is up. Let's see who's winning!
+                </p>
+                <div className="mt-6 flex justify-center gap-1">
+                  {[0, 1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className="size-2 animate-bounce rounded-full bg-amber-400"
+                      style={{ animationDelay: `${i * 0.15}s` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {currentSlideState === "ended" && (
             <motion.div
               key="ended"
               initial={{ opacity: 0, y: 14 }}

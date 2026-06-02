@@ -70,4 +70,5 @@ export type QuestionWithOptions = Question & {
 
 export type RoomEvent =
   | { type: "slide-change"; slideIndex: number; startedAt: string }
+  | { type: "leaderboard-show"; slideIndex: number }
   | { type: "quiz-ended"; endedAt: string };
