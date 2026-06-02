@@ -1,0 +1,297 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
+import { QRCodeSVG } from "qrcode.react";
+import { ArrowRight, BarChart3, Crown, Play, RadioTower, Square, Users } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
+import { broadcastRoomEvent } from "@/lib/realtime/room-channel";
+import { useRoomRealtime } from "@/hooks/use-room-realtime";
+import type { Presentation, QuestionWithOptions, Response as ResponseType } from "@/lib/supabase/types";
+
+export default function PresentPage() {
+  const params = useParams<{ id: string }>();
+  const supabase = useMemo(() => createClient(), []);
+  const [deck, setDeck] = useState<Presentation | null>(null);
+  const [questions, setQuestions] = useState<QuestionWithOptions[]>([]);
+  const [responses, setResponses] = useState<ResponseType[]>([]);
+  const [status, setStatus] = useState("Loading presenter screen...");
+  const [loading, setLoading] = useState(true);
+  const room = useRoomRealtime(deck?.room_code ?? "");
+  const activeQuestion = deck ? questions[deck.current_slide_index] : undefined;
+  const joinUrl = typeof window === "undefined" || !deck ? "" : `${window.location.origin}/join?code=${deck.room_code}`;
+
+  useEffect(() => {
+    if (!params.id) return;
+
+    async function load() {
+      const { data: presentation, error: deckError } = await supabase
+        .from("presentations")
+        .select("*")
+        .eq("id", params.id)
+        .single();
+
+      if (deckError || !presentation) {
+        setStatus(deckError?.message ?? "Deck not found.");
+        setLoading(false);
+        return;
+      }
+
+      const { data: loadedQuestions, error: questionError } = await supabase
+        .from("questions")
+        .select("*, options(*)")
+        .eq("presentation_id", params.id)
+        .order("order_index", { ascending: true });
+
+      const { data: existingResponses } = await supabase
+        .from("responses")
+        .select("*")
+        .eq("room_code", presentation.room_code);
+
+      setDeck(presentation);
+      setQuestions((loadedQuestions ?? []) as QuestionWithOptions[]);
+      setResponses(existingResponses ?? []);
+      setStatus(questionError?.message ?? "Ready to present.");
+      setLoading(false);
+    }
+
+    void load();
+  }, [params.id, supabase]);
+
+  useEffect(() => {
+    if (room.presentation) setDeck(room.presentation);
+  }, [room.presentation]);
+
+  useEffect(() => {
+    if (room.responses.length) {
+      setResponses((current) => {
+        const known = new Set(current.map((r) => r.id));
+        return [...current, ...room.responses.filter((r) => !known.has(r.id))];
+      });
+    }
+  }, [room.responses]);
+
+  const goToSlide = useCallback(async (slideIndex: number) => {
+    if (!deck) return;
+    const boundedIndex = Math.min(slideIndex, questions.length - 1);
+    const patch = {
+      is_live: true,
+      current_slide_index: boundedIndex,
+      updated_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from("presentations")
+      .update(patch)
+      .eq("id", deck.id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      setStatus(error?.message ?? "Could not change slide.");
+      return;
+    }
+
+    setDeck(data);
+    await broadcastRoomEvent(supabase, deck.room_code, {
+      type: "slide-change",
+      slideIndex: boundedIndex,
+      startedAt: new Date().toISOString()
+    });
+  }, [deck, questions.length, supabase]);
+
+  const endQuiz = useCallback(async () => {
+    if (!deck) return;
+    await supabase
+      .from("presentations")
+      .update({ is_live: false, current_slide_index: -1, updated_at: new Date().toISOString() })
+      .eq("id", deck.id);
+    await broadcastRoomEvent(supabase, deck.room_code, { type: "quiz-ended", endedAt: new Date().toISOString() });
+    setDeck((current) => current ? { ...current, is_live: false, current_slide_index: -1 } : current);
+    setStatus("Quiz ended.");
+  }, [deck, supabase]);
+
+  const currentResponses = activeQuestion
+    ? responses.filter((r) => r.question_id === activeQuestion.id)
+    : [];
+
+  const optionVotes = useMemo(() => {
+    if (!activeQuestion) return [];
+    return activeQuestion.options.map((option) => {
+      const count = currentResponses.filter((r) => r.option_id === option.id).length;
+      const pct = currentResponses.length ? Math.round((count / currentResponses.length) * 100) : 0;
+      const correct = option.is_correct;
+      return { ...option, count, pct, correct };
+    });
+  }, [activeQuestion, currentResponses]);
+
+  const leaderboard = useMemo(() =>
+    Object.values(
+      responses.reduce<Record<string, { nickname: string; points: number }>>((acc, r) => {
+        acc[r.user_nickname] ??= { nickname: r.user_nickname, points: 0 };
+        acc[r.user_nickname].points += r.points_earned;
+        return acc;
+      }, {})
+    ).sort((a, b) => b.points - a.points),
+    [responses]
+  );
+
+  if (loading) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-surface">
+        <div className="size-8 animate-spin rounded-full border-4 border-surface-border border-t-fikavo-600" />
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-dvh bg-surface">
+      <header className="sticky top-0 z-50 border-b border-surface-border bg-white/80 backdrop-blur-lg">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard" className="text-sm font-semibold text-slate-500 hover:text-slate-700">
+              &larr; Dashboard
+            </Link>
+            <span className="text-slate-300">/</span>
+            <h1 className="text-base font-bold text-slate-900 truncate max-w-48">{deck?.title ?? "Loading"}</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-fikavo-50 px-3 py-1.5 text-xs font-semibold text-fikavo-700">
+              <Users className="size-3.5" />
+              {room.activeCount}
+            </span>
+            {deck?.current_slide_index === -1 ? (
+              <Button size="sm" onClick={() => goToSlide(0)}>
+                <Play className="size-3.5" />
+                Start
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => goToSlide((deck?.current_slide_index ?? 0) + 1)} disabled={(deck?.current_slide_index ?? 0) >= questions.length - 1}>
+                <ArrowRight className="size-3.5" />
+                Next
+              </Button>
+            )}
+            <Button size="sm" variant="danger" onClick={endQuiz}>
+              <Square className="size-3.5" />
+              End
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <section className="mx-auto grid w-full max-w-7xl gap-4 px-4 py-4 lg:grid-cols-[1fr_20rem]">
+        <div className="min-h-[30rem] rounded-xl border border-surface-border bg-white p-5 shadow-card">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeQuestion?.id ?? "waiting"}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+            >
+              {!activeQuestion ? (
+                <div className="flex min-h-[25rem] flex-col items-center justify-center gap-4 text-center">
+                  <RadioTower className="size-12 text-fikavo-400" />
+                  <div>
+                    <h2 className="text-3xl font-black text-slate-900">Room {deck?.room_code ?? "------"}</h2>
+                    <p className="mt-1 text-slate-500">{status}</p>
+                  </div>
+                  <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-fikavo-50 px-4 py-2 text-sm font-medium text-fikavo-700">
+                    <BarChart3 className="size-4" />
+                    {questions.length} questions prepared
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Question {deck ? deck.current_slide_index + 1 : 0} of {questions.length}
+                    </p>
+                    <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+                      {activeQuestion.time_limit}s
+                    </span>
+                  </div>
+                  <h2 className="text-2xl font-black leading-tight text-slate-900 md:text-3xl">
+                    {activeQuestion.question_text}
+                  </h2>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {optionVotes.map((option) => (
+                      <div
+                        key={option.id}
+                        className={`rounded-xl border p-4 transition-all ${
+                          option.correct
+                            ? "border-green-200 bg-green-50"
+                            : "border-surface-border bg-surface-muted"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-bold text-slate-800">{option.option_text}</span>
+                          <span className="font-mono text-sm font-bold text-fikavo-600">{option.count}</span>
+                        </div>
+                        <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-surface-border">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              option.correct ? "bg-green-500" : "bg-fikavo-500"
+                            }`}
+                            style={{ width: `${option.pct}%` }}
+                          />
+                        </div>
+                        <p className="mt-1 text-right text-xs text-slate-400">{option.pct}%</p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-center text-sm text-slate-400">
+                    {currentResponses.length} response{currentResponses.length !== 1 ? "s" : ""} so far
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <aside className="space-y-4">
+          <div className="rounded-xl border border-surface-border bg-white p-4 shadow-card">
+            <div className="mx-auto w-40">
+              {joinUrl ? <QRCodeSVG value={joinUrl} className="h-auto w-full" /> : null}
+            </div>
+          </div>
+          <div className="rounded-xl border border-surface-border bg-white p-4 shadow-card">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Room code</p>
+            <p className="mt-1 font-mono text-3xl font-black tracking-widest text-fikavo-600">
+              {deck?.room_code ?? "------"}
+            </p>
+          </div>
+          <div className="rounded-xl border border-surface-border bg-white p-4 shadow-card">
+            <div className="mb-3 flex items-center gap-2">
+              <Crown className="size-5 text-amber-500" />
+              <h2 className="text-sm font-bold text-slate-800">Leaderboard</h2>
+            </div>
+            <div className="space-y-2">
+              {leaderboard.slice(0, 8).map((player, index) => (
+                <div key={player.nickname} className="flex items-center justify-between rounded-lg bg-surface-muted px-3 py-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-xs font-bold ${
+                      index === 0 ? "text-amber-500" :
+                      index === 1 ? "text-slate-400" :
+                      index === 2 ? "text-orange-400" :
+                      "text-slate-400"
+                    }`}>
+                      #{index + 1}
+                    </span>
+                    <span className="truncate text-sm font-medium text-slate-700">{player.nickname}</span>
+                  </div>
+                  <span className="font-mono text-sm font-bold text-fikavo-600">{player.points}</span>
+                </div>
+              ))}
+              {leaderboard.length === 0 && (
+                <p className="text-sm text-slate-400">No answers yet.</p>
+              )}
+            </div>
+          </div>
+        </aside>
+      </section>
+    </main>
+  );
+}

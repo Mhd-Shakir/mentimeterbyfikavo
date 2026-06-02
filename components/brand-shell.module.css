@@ -1,0 +1,67 @@
+.main {
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.headerContainer {
+  margin: 0 auto;
+  max-width: 1200px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  width: 100%;
+}
+
+.logoLink {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.logoLink:hover {
+  opacity: 0.8;
+}
+
+.logoIconWrapper {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  color: white;
+  box-shadow: 0 2px 10px var(--accent-glow);
+}
+
+.joinLink {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.joinLink:hover {
+  color: var(--accent-secondary);
+  text-shadow: 0 0 8px var(--accent-glow);
+}
