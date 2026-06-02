@@ -34,18 +34,6 @@ function JoinForm() {
     setLoading(true);
     setStatus("");
 
-    const { data, error } = await supabase
-      .from("presentations")
-      .select("room_code,is_live")
-      .eq("room_code", cleanCode)
-      .maybeSingle();
-
-    if (error || !data) {
-      setStatus(error?.message ?? "Room not found or not live yet.");
-      setLoading(false);
-      return;
-    }
-
     sessionStorage.setItem(`fikavo:nickname:${cleanCode}`, cleanName);
     router.push(`/room/${cleanCode}`);
   }

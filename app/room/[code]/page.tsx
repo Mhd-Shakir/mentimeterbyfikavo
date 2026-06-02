@@ -66,7 +66,7 @@ export default function ParticipantRoomPage() {
         .maybeSingle();
 
       if (error || !deck) {
-        setStatus(error?.message ?? "Room not found.");
+        setStatus("Waiting for the host to start...");
         return;
       }
 
@@ -89,6 +89,19 @@ export default function ParticipantRoomPage() {
       setPresentation(room.presentation);
     }
   }, [room.presentation]);
+
+  useEffect(() => {
+    if (presentation?.is_live && !questions) {
+      supabase
+        .from("questions")
+        .select("*, options(*)")
+        .eq("presentation_id", presentation.id)
+        .order("order_index", { ascending: true })
+        .then(({ data }) => {
+          if (data) setQuestions(data as QuestionWithOptions[]);
+        });
+    }
+  }, [presentation?.is_live, presentation?.id, questions, supabase]);
 
   useEffect(() => {
     if (!room.lastEvent) return;
